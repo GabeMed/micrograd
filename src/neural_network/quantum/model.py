@@ -10,7 +10,7 @@ from .simulator import Circuit
 
 
 class QuantumNeuron(Module):
-    """Data re-uploading variational circuit with a one-weight classical readout.
+    """Data re-uploading variational circuit with an affine classical readout.
 
     Every layer ``l`` applies, to each qubit ``q``::
 

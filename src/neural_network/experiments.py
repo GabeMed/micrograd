@@ -186,8 +186,11 @@ def plot_training_curves(histories, path):
         ax.set_title(title, fontsize=9, color=INK, loc="left")
         ax.set_xlabel("SGD step", fontsize=8, color=INK_2)
         ax.set_ylabel(ylabel, fontsize=8, color=INK_2)
-    ax_loss.set_yscale("log")
-    ax_acc.set_ylim(0.5, 1.01)
+    # The hinge loss reaches exactly 0 once every margin is met, so a log axis cannot
+    # show it; symlog is linear below 1e-3 and logarithmic above.
+    ax_loss.set_yscale("symlog", linthresh=1e-3)
+    ax_loss.set_ylim(bottom=0)
+    ax_acc.set_ylim(0.85, 1.005)
     ax_acc.yaxis.set_major_formatter(lambda v, _: f"{v:.0%}")
     ax_acc.legend(fontsize=7, frameon=False, loc="lower right")
     fig.savefig(path, dpi=110, facecolor=SURFACE)
@@ -219,8 +222,14 @@ def compare(seeds=5, steps=200, out="assets", kinds=tuple(MODELS)):
         "processor": platform.processor(),
         "numpy": np.__version__,
     }
+    curves = {
+        k: {key: v[1][key] for key in ("loss", "test_step", "test_acc")} for k, v in first.items()
+    }
     (out / "results.json").write_text(
-        json.dumps({"meta": meta, "summary": summary, "runs": results}, indent=2) + "\n"
+        json.dumps(
+            {"meta": meta, "summary": summary, "runs": results, "seed0_curves": curves}, indent=2
+        )
+        + "\n"
     )
     (out / "results.md").write_text(table + "\n")
     print("\n" + table)
