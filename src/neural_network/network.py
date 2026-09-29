@@ -1,9 +1,11 @@
-from neural_network.value import Value
+"""Neuron, Layer and a multi-layer perceptron (NN) built on the scalar Value engine."""
+
 from numpy import random
+
+from .value import Value
 
 
 class Module:
-
     def zero_grad(self):
         for p in self.parameters():
             p.grad = 0
@@ -13,7 +15,6 @@ class Module:
 
 
 class Neuron(Module):
-
     def __init__(self, nin, nonlin=True):
         # Initialization of the bias and weights
         self.w = [Value(random.uniform(-1, 1)) for _ in range(nin)]
@@ -34,7 +35,6 @@ class Neuron(Module):
 
 
 class Layer(Module):
-
     def __init__(self, nin, nout, **kwargs):
         self.neurons = [Neuron(nin, **kwargs) for _ in range(nout)]
 
@@ -50,12 +50,10 @@ class Layer(Module):
 
 
 class NN(Module):
-
     def __init__(self, nin, nouts: list):
         sz = [nin] + nouts
         self.layers = [
-            Layer(sz[i], sz[i + 1], nonlin=i != len(nouts) - 1)
-            for i in range(len(nouts))
+            Layer(sz[i], sz[i + 1], nonlin=i != len(nouts) - 1) for i in range(len(nouts))
         ]
 
     def __call__(self, x):

@@ -1,4 +1,15 @@
+"""A scalar-valued reverse-mode autograd engine."""
+
+import math
+
+
 class Value:
+    """A scalar node in a computation graph.
+
+    Stores its value (``data``), the derivative of the graph output with respect to
+    it (``grad``), the nodes it was computed from (``_prev``) and a closure
+    (``_update_grad``) that applies the local chain rule to those nodes.
+    """
 
     def __init__(self, data, _children=(), _op="", label=""):
         self.data = data
@@ -33,9 +44,7 @@ class Value:
         return out
 
     def __pow__(self, other):  # self ** other
-        assert isinstance(
-            other, (int, float)
-        ), "Only supporting int/float powers for now"
+        assert isinstance(other, (int, float)), "Only supporting int/float powers for now"
         out = Value(self.data**other, (self,), f"**{other}")
 
         def _update_grad():
@@ -50,6 +59,39 @@ class Value:
 
         def _update_grad():
             self.grad += (out.data > 0) * out.grad
+
+        out._update_grad = _update_grad
+
+        return out
+
+    def tanh(self):
+        t = math.tanh(self.data)
+        out = Value(t, (self,), "tanh")
+
+        def _update_grad():
+            self.grad += (1 - t**2) * out.grad
+
+        out._update_grad = _update_grad
+
+        return out
+
+    def exp(self):
+        e = math.exp(self.data)
+        out = Value(e, (self,), "exp")
+
+        def _update_grad():
+            self.grad += e * out.grad
+
+        out._update_grad = _update_grad
+
+        return out
+
+    def log(self):
+        assert self.data > 0, "log is only defined for positive values"
+        out = Value(math.log(self.data), (self,), "log")
+
+        def _update_grad():
+            self.grad += out.grad / self.data
 
         out._update_grad = _update_grad
 
@@ -80,20 +122,26 @@ class Value:
         return f"Value(data={self.data}, grad={self.grad})"
 
     def backward_prop(self):
-        # Ordene topologicamente cada elemento do grafo
+        # Topologically sort every node of the graph. The DFS is iterative so that
+        # deep graphs (long sums over a dataset) do not hit Python's recursion limit.
         topo = []
         visited = set()
-
-        def build_topo(v):
-            if v not in visited:
-                visited.add(v)
-                for child in v._prev:
-                    build_topo(child)
+        stack = [(self, False)]
+        while stack:
+            v, children_done = stack.pop()
+            if children_done:
                 topo.append(v)
+                continue
+            if v in visited:
+                continue
+            visited.add(v)
+            stack.append((v, True))
+            stack.extend((child, False) for child in v._prev if child not in visited)
 
-        build_topo(self)
-
-        # Em cada operação, aplique a função _update_grad() para acumular o gradiente via regra da cadeia
+        # Visit nodes from the output back to the leaves, applying each node's
+        # _update_grad() to accumulate gradients through the chain rule.
         self.grad = 1
         for v in reversed(topo):
             v._update_grad()
+
+    backward = backward_prop
