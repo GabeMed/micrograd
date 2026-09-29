@@ -115,6 +115,22 @@ def test_shot_based_parameter_shift_is_unbiased():
     np.testing.assert_allclose(np.mean(estimates, axis=0), exact, atol=0.012)
 
 
+def test_shot_based_training_gradients_are_reproducible():
+    rng = np.random.default_rng(4)
+    X = rng.normal(size=(10, 2))
+    y = np.where(X[:, 1] > 0, 1, -1)
+
+    def gradients():
+        np.random.seed(0)
+        model = QuantumNeuron(n_layers=2, shots=100, rng=np.random.default_rng(1))
+        total, _ = loss(X, y, model, alpha=0.0)
+        total.backward_prop()
+        return [p.grad for p in model.parameters()]
+
+    # Equal up to float summation order (the traversal order of shared parameters varies)
+    np.testing.assert_allclose(gradients(), gradients(), rtol=1e-12, atol=1e-15)
+
+
 def test_matches_pennylane():
     qml = pytest.importorskip("pennylane")
     pnp = pytest.importorskip("pennylane.numpy")

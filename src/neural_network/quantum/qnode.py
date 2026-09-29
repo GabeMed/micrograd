@@ -42,13 +42,20 @@ def expval(circuit, angles, wires=(0,), shots=None, rng=None):
     """
     angles = [a if isinstance(a, Value) else Value(a) for a in angles]
     theta = np.array([a.data for a in angles], dtype=float)
+    backward_rng = None
+    if shots is not None:
+        # The backward pass visits nodes in an order that depends on set iteration,
+        # so each node gets its own generator, seeded here in forward order. This
+        # keeps shot-based training reproducible for a fixed ``rng``.
+        rng = np.random.default_rng() if rng is None else rng
+        backward_rng = np.random.default_rng(rng.integers(2**63))
     z = circuit.expval(theta, wires, shots=shots, rng=rng)[0]
 
     cache = {}
 
     def jacobian():
         if "J" not in cache:
-            cache["J"] = parameter_shift_jacobian(circuit, theta, wires, shots, rng)
+            cache["J"] = parameter_shift_jacobian(circuit, theta, wires, shots, backward_rng)
         return cache["J"]
 
     outs = []
